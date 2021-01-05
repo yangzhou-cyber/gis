@@ -176,12 +176,16 @@ export default function length(map, type) {
         draw.on('drawstart', function (evt) {
             // set sketch
             sketch = evt.feature;
-
-            /** @type {import("../src/ol/coordinate.js").Coordinate|undefined} */
+            let geom=sketch.getGeometry();
+            console.log(geom)
             var tooltipCoord = evt.coordinate;
+            clickListener = map.on('singleclick', function (e) {
+                if(geom instanceof LineString){
+                    createTooltip(formatLength(geom),e.coordinate)
+                }
+            })
 
             listener = sketch.getGeometry().on('change', function (evt) {
-                var geom = evt.target;
                 var output;
                 if (geom instanceof Polygon) {
                     output = formatArea(geom);
@@ -189,13 +193,7 @@ export default function length(map, type) {
                 } else if (geom instanceof LineString) {
                     output = formatLength(geom);
                     tooltipCoord = geom.getLastCoordinate();
-                    clickListener = map.on('click', function (e) {
-                        console.log(map.getEventCoordinate(e))
-                    })
                 }
-                measureTooltipElement.innerHTML = output;
-                console.log('jjjjjjjj')
-                // createMeasureTooltip(output)
                 measureTooltip.setPosition(tooltipCoord);
             });
         });
@@ -206,8 +204,9 @@ export default function length(map, type) {
             sketch = null;
             // unset tooltip so that a new one can be created
             measureTooltipElement = null;
-            createMeasureTooltip();
+            // createMeasureTooltip();
             unByKey(listener);
+            map.removeOverlay(measureTooltip)
             map.removeInteraction(draw)
         });
     }
@@ -232,13 +231,13 @@ export default function length(map, type) {
     /**
      * Creates a new measure tooltip
      */
-    function createMeasureTooltip(output) {
+    function createMeasureTooltip() {
         if (measureTooltipElement) {
             measureTooltipElement.parentNode.removeChild(measureTooltipElement);
         }
         measureTooltipElement = document.createElement('div');
         measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
-        measureTooltipElement.innerHTML = output;
+        measureTooltipElement.innerHTML="双击结束"
         measureTooltip = new Overlay({
             element: measureTooltipElement,
             offset: [0, -15],
@@ -246,7 +245,21 @@ export default function length(map, type) {
         });
         map.addOverlay(measureTooltip);
     }
-    // createHelpTooltip()
+    function createTooltip(output,coordinate){
+        console.log(output,coordinate)
+        let element=document.createElement('div')
+        element.className="ol-tooltip ol-tooltip-measure"
+        element.innerHTML=output
+        let overlay= new Overlay({
+            element,
+            offset:[0,-15],
+            position:"bottom-center"
+        })
+        overlay.setPosition(coordinate)
+        map.addOverlay(layer)
+        return overlay
+    }
+    createHelpTooltip()
     // addInteraction()
     return addInteraction
 }
