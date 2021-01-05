@@ -9,12 +9,16 @@ import { OSM, Vector as VectorSource } from 'ol/source';
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer';
 import { getArea, getLength } from 'ol/sphere';
 import { unByKey } from 'ol/Observable';
+import { DoubleClickZoom } from "ol/interaction"
 
 export default function length(map, type) {
-    var raster = new TileLayer({
-        source: new OSM(),
-    });
-
+    const dblClickInteraction = map
+        .getInteractions()
+        .getArray()
+        .find(interaction => {
+            return interaction instanceof DoubleClickZoom;
+        });
+    map.removeInteraction(dblClickInteraction);
     var source = new VectorSource();
 
     var vector = new VectorLayer({
@@ -88,20 +92,7 @@ export default function length(map, type) {
             return;
         }
         /** @type {string} */
-        var helpMsg = 'Click to start drawing';
-
-        if (sketch) {
-            var geom = sketch.getGeometry();
-            if (geom instanceof Polygon) {
-                helpMsg = continuePolygonMsg;
-            } else if (geom instanceof LineString) {
-                helpMsg = continueLineMsg;
-            }
-        }
-
-        helpTooltipElement.innerHTML = helpMsg;
         helpTooltip.setPosition(evt.coordinate);
-
         helpTooltipElement.classList.remove('hidden');
     };
 
@@ -143,6 +134,9 @@ export default function length(map, type) {
 
     function addInteraction() {
         map.on('pointermove', pointerMoveHandler);
+        map.getViewport().addEventListener('mouseout', function () {
+            helpTooltipElement.classList.add('hidden');
+        });
         draw = new Draw({
             source: source,
             type,
@@ -172,19 +166,22 @@ export default function length(map, type) {
         createHelpTooltip();
 
         var listener;
+        let showLength = false;
         let clickListener;
         draw.on('drawstart', function (evt) {
             // set sketch
-            sketch = evt.feature;
-            let geom=sketch.getGeometry();
-            console.log(geom)
-            var tooltipCoord = evt.coordinate;
+
+            showLength = false;
             clickListener = map.on('singleclick', function (e) {
-                if(geom instanceof LineString){
-                    createTooltip(formatLength(geom),e.coordinate)
+                if (showLength) {
+                    if (geom instanceof LineString) {
+                        createTooltip(formatLength(geom), e.coordinate)
+                    }
                 }
             })
-
+            sketch = evt.feature;
+            let geom = sketch.getGeometry();
+            var tooltipCoord = evt.coordinate;
             listener = sketch.getGeometry().on('change', function (evt) {
                 var output;
                 if (geom instanceof Polygon) {
@@ -192,20 +189,31 @@ export default function length(map, type) {
                     tooltipCoord = geom.getInteriorPoint().getCoordinates();
                 } else if (geom instanceof LineString) {
                     output = formatLength(geom);
+                    if (geom.getCoordinates().length > 2) {
+                        showLength = true
+                    }
                     tooltipCoord = geom.getLastCoordinate();
                 }
+                measureTooltipElement.innerHTML = output;
                 measureTooltip.setPosition(tooltipCoord);
             });
         });
-        draw.on('drawend', function () {
-            measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
+        draw.on('drawend', function (e) {
+            unByKey('dbclick')
             measureTooltip.setOffset([0, -7]);
             // unset sketch
             sketch = null;
             // unset tooltip so that a new one can be created
             measureTooltipElement = null;
-            // createMeasureTooltip();
+            let geom = e.feature.getGeometry();
+            // if (geom instanceof LineString) {
+            //     createTooltip(formatLength(geom), geom.getLastCoordinate())
+            // }else{
+            // }
+            createMeasureTooltip()
             unByKey(listener);
+            unByKey(clickListener)
+            map.removeOverlay(helpTooltip)
             map.removeOverlay(measureTooltip)
             map.removeInteraction(draw)
         });
@@ -220,6 +228,7 @@ export default function length(map, type) {
         }
         helpTooltipElement = document.createElement('div');
         helpTooltipElement.className = 'ol-tooltip hidden';
+        helpTooltipElement.innerHTML = '双击结束';
         helpTooltip = new Overlay({
             element: helpTooltipElement,
             offset: [15, 0],
@@ -237,7 +246,7 @@ export default function length(map, type) {
         }
         measureTooltipElement = document.createElement('div');
         measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
-        measureTooltipElement.innerHTML="双击结束"
+        measureTooltipElement.innerHTML = "双击结束"
         measureTooltip = new Overlay({
             element: measureTooltipElement,
             offset: [0, -15],
@@ -245,18 +254,17 @@ export default function length(map, type) {
         });
         map.addOverlay(measureTooltip);
     }
-    function createTooltip(output,coordinate){
-        console.log(output,coordinate)
-        let element=document.createElement('div')
-        element.className="ol-tooltip ol-tooltip-measure"
-        element.innerHTML=output
-        let overlay= new Overlay({
+    function createTooltip(output, coordinate) {
+        let element = document.createElement('div')
+        element.className = "ol-tooltip ol-tooltip-measure"
+        element.innerHTML = output
+        let overlay = new Overlay({
             element,
-            offset:[0,-15],
-            position:"bottom-center"
+            offset: [-30, -30],
+            position: "bottom-center"
         })
         overlay.setPosition(coordinate)
-        map.addOverlay(layer)
+        map.addOverlay(overlay)
         return overlay
     }
     createHelpTooltip()
