@@ -676,7 +676,7 @@ export default {
 
     this.view = new View({
       // minZoom: 11,
-      maxZoom: 19,
+      // maxZoom: 19,
       zoom: 17,
       center: transform([118.803623, 31.998328], "EPSG:4326", "EPSG:3857"),
     });

@@ -131,8 +131,12 @@ export default function length(map, type) {
         }
         return output;
     };
-
+    let add=false;
     function addInteraction() {
+        if(add){
+            return
+        }
+        add=true
         map.on('pointermove', pointerMoveHandler);
         map.getViewport().addEventListener('mouseout', function () {
             helpTooltipElement.classList.add('hidden');
@@ -170,11 +174,12 @@ export default function length(map, type) {
         let clickListener;
         draw.on('drawstart', function (evt) {
             // set sketch
-
+            
             showLength = false;
             clickListener = map.on('singleclick', function (e) {
                 if (showLength) {
                     if (geom instanceof LineString) {
+                        console.log(formatLength(geom))
                         createTooltip(formatLength(geom), e.coordinate)
                     }
                 }
@@ -216,6 +221,7 @@ export default function length(map, type) {
             map.removeOverlay(helpTooltip)
             map.removeOverlay(measureTooltip)
             map.removeInteraction(draw)
+            add=false
         });
     }
 
