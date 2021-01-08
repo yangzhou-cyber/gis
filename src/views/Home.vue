@@ -3,7 +3,7 @@
     <!-- nav -->
     <div class="nav"></div>
     <!-- 地图 -->
-    <div id="map"></div>
+    <div id="map" ref="map"></div>
 
     <!-- 占地图例信息 -->
     <ul id="landmark" v-if="isPlace">
@@ -194,9 +194,10 @@
         padding: 5px 20px;
         cursor: pointer;
       "
-      ref="length"
+      @click="changeScreen"
+      id="fullScreen"
     >
-      测距
+      全屏
     </div>
   </div>
 </template>
@@ -255,6 +256,7 @@ import { FullScreen } from "ol/control";
 import { Draw, Modify, Snap } from "ol/interaction";
 axios.defaults.baseURL = process.env.VUE_APP_BASE_URL;
 import length from "@/utils/length";
+import fullScreen from "@/utils/fullScreen"
 export default {
   name: "gisdemo-index",
   data() {
@@ -353,8 +355,10 @@ export default {
       select: null, // 覆盖框overlay选中
       pointActiveIcon: null, // 选中采样点样式
       outletActiveIcon: null, // 选中排口样式
+      full:false
     };
   },
+  mixins:[fullScreen('home','full')],
   components: {
     pointQulity,
     landUse,
@@ -492,7 +496,7 @@ export default {
       });
   },
   mounted() {
-    // console.log(getService('wfs'));
+    console.log(getService('wfs'));
     // 排口数据
     let adrainage = new VectorSource({});
     axios
@@ -567,6 +571,7 @@ export default {
       )
       .then((res) => {
         let features = new WMSGetFeatureInfo().readFeatures(res.data);
+        console.log(features)
         features.forEach((feature) => {
           vector.addFeatures(features);
           let obj = feature.getProperties();
@@ -703,7 +708,11 @@ export default {
       ],
       view: this.view,
     });
-    this.$refs.length.addEventListener("click", length(this.map,'LineString'));
+       
+
+
+
+       
 
     // 切换底图  与无人机影像的叠加
     let changeMap = document.getElementById("changeMap");

@@ -20,6 +20,11 @@ import GeoJSON from "ol/format/GeoJSON";
 import { WFS } from "ol/format"
 import { and, equalTo } from 'ol/format/filter';
 import { Map, View } from "ol";
+import {
+    and as andFilter,
+    equalTo as equalToFilter,
+    like as likeFilter,
+} from 'ol/format/filter';
 export function getService(type, params) {
     let url = service[type];
     if (type == 'tms') {
@@ -59,23 +64,22 @@ export function getService(type, params) {
             return layer
         })
     } else if (type == 'wfs') {
-        // let map = new Map();
-        // let layer = new VectorLayer({
-        //     format: new GeoJSON(),
-        //     loader: function (extent, resolution, projection) {
-        // var proj = projection.getCode();
         var featureRequest = new WFS().writeGetFeature({
             srsName: "EPSG:3857",
             featureNS: "http://192.168.1.82:8888//demo",
             featurePrefix: "demo",
-            featureTypes: ['watercourses'],
+            featureTypes: ['show_rivers'],
 
-            filter: equalTo('NAME', "胥河")
         })
-        axios.post(url,new XMLSerializer().serializeToString(featureRequest),{headers:{"Content-Type": "application/xml"}}).then(res => {
-            console.log(res.data)
-            let features = new WMSGetFeatureInfo().readFeatures(res.data);
-            console.log(features)
+        fetch(url,{
+            body:new XMLSerializer().serializeToString(featureRequest),
+            method:"POST"
+        }).then(res => {
+            return res.json()
+            // let features = new WMSGetFeatureInfo().readFeatures(res.data);
+            // console.log(features)
+        }).then(res=>{
+            console.log(res)
         })
     } else if (type == 'wms') {
         return new Promise((resolve, reject) => {

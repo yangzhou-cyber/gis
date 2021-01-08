@@ -11,7 +11,7 @@ import { getArea, getLength } from 'ol/sphere';
 import { unByKey } from 'ol/Observable';
 import { DoubleClickZoom } from "ol/interaction"
 
-export default function length(map, type) {
+export default function length(context,map, type) {
     const dblClickInteraction = map
         .getInteractions()
         .getArray()
@@ -19,6 +19,7 @@ export default function length(map, type) {
             return interaction instanceof DoubleClickZoom;
         });
     map.removeInteraction(dblClickInteraction);
+    let overlays=[];
     var source = new VectorSource();
 
     var vector = new VectorLayer({
@@ -71,27 +72,13 @@ export default function length(map, type) {
      */
     var measureTooltip;
 
-    /**
-     * Message to show when the user is drawing a polygon.
-     * @type {string}
-     */
-    var continuePolygonMsg = 'Click to continue drawing the polygon';
+    var cancel,cancelElement
 
-    /**
-     * Message to show when the user is drawing a line.
-     * @type {string}
-     */
-    var continueLineMsg = 'Click to continue drawing the line';
 
-    /**
-     * Handle pointer move.
-     * @param {import("../src/ol/MapBrowserEvent").default} evt The event.
-     */
     var pointerMoveHandler = function (evt) {
         if (evt.dragging) {
             return;
         }
-        /** @type {string} */
         helpTooltip.setPosition(evt.coordinate);
         helpTooltipElement.classList.remove('hidden');
     };
@@ -133,12 +120,13 @@ export default function length(map, type) {
     };
     let add=false;
     function addInteraction() {
+        this.$refs.map.classList.add('cursor')
         if(add){
             return
         }
         add=true
-        map.on('pointermove', pointerMoveHandler);
-        map.getViewport().addEventListener('mouseout', function () {
+        let movein=map.on('pointermove', pointerMoveHandler);
+        let moveout=map.getViewport().addEventListener('mouseout', function () {
             helpTooltipElement.classList.add('hidden');
         });
         draw = new Draw({
@@ -153,15 +141,6 @@ export default function length(map, type) {
                     lineDash: [10, 10],
                     width: 2,
                 }),
-                image: new CircleStyle({
-                    radius: 5,
-                    stroke: new Stroke({
-                        color: 'rgba(0, 0, 0, 0.7)',
-                    }),
-                    fill: new Fill({
-                        color: 'rgba(255, 255, 255, 0.2)',
-                    }),
-                }),
             }),
         });
         map.addInteraction(draw);
@@ -173,8 +152,6 @@ export default function length(map, type) {
         let showLength = false;
         let clickListener;
         draw.on('drawstart', function (evt) {
-            // set sketch
-            
             showLength = false;
             clickListener = map.on('singleclick', function (e) {
                 if (showLength) {
@@ -203,27 +180,32 @@ export default function length(map, type) {
                 measureTooltip.setPosition(tooltipCoord);
             });
         });
-        draw.on('drawend', function (e) {
+        draw.on('drawend',  (e)=> {
             unByKey('dbclick')
             measureTooltip.setOffset([0, -7]);
             // unset sketch
             sketch = null;
             // unset tooltip so that a new one can be created
             measureTooltipElement = null;
-            let geom = e.feature.getGeometry();
-            // if (geom instanceof LineString) {
-            //     createTooltip(formatLength(geom), geom.getLastCoordinate())
-            // }else{
-            // }
             createMeasureTooltip()
-            unByKey(listener);
-            unByKey(clickListener)
+            unByKey([listener,clickListener,movein,moveout]);
+            console.log(e.feature.getGeometry())
+            let geom = e.feature.getGeometry();
+            let center;
+            if(geom instanceof LineString){
+                center=e.feature.getGeometry().getLastCoordinate();
+            }else if(geom instanceof Polygon){
+                center=e.feature.getGeometry().getInteriorPoint().getCoordinates();
+            }
+            createdCancel(center)
             map.removeOverlay(helpTooltip)
             map.removeOverlay(measureTooltip)
             map.removeInteraction(draw)
             add=false
+        this.$refs.map.classList.remove('cursor')
         });
     }
+    addInteraction=addInteraction.bind(context)
 
     /**
      * Creates a new help tooltip
@@ -241,6 +223,7 @@ export default function length(map, type) {
             positioning: 'center-left',
         });
         map.addOverlay(helpTooltip);
+        overlays.push(helpTooltip)
     }
 
     /**
@@ -259,6 +242,7 @@ export default function length(map, type) {
             positioning: 'bottom-center',
         });
         map.addOverlay(measureTooltip);
+        overlays.push(measureTooltip)
     }
     function createTooltip(output, coordinate) {
         let element = document.createElement('div')
@@ -271,9 +255,31 @@ export default function length(map, type) {
         })
         overlay.setPosition(coordinate)
         map.addOverlay(overlay)
+        overlays.push(overlay)
         return overlay
     }
-    createHelpTooltip()
-    // addInteraction()
+    function createdCancel(coordinate){
+        if(!cancelElement){
+            cancelElement = document.createElement('div');
+            cancelElement.className = 'ol-tooltip';
+            cancelElement.style.cursor="pointer"
+            cancelElement.addEventListener('click',()=>{
+                overlays.forEach(item=>{
+                    map.removeOverlay(item)
+                })
+                vector.getSource().clear()
+            })
+            cancelElement.innerHTML="<span class='el-icon-delete-solid' style='color:red;font-size:18px;'></span>"
+        }
+        let overlay=new Overlay({
+            element:cancelElement,
+            position:"top-center",
+            offset:[-20,30]
+        })
+        overlay.setPosition(coordinate)
+        map.addOverlay(overlay)
+        overlays.push(overlay)
+    }
+    // createHelpTooltip()
     return addInteraction
 }
